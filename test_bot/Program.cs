@@ -1,76 +1,26 @@
 ﻿using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.ReplyMarkups;
+using Telegram.Bot.Args;
 using System.Threading;
 using System.Threading.Tasks;
-using Telegram.Bot.Types.ReplyMarkups;
+using Telegram.Bot.Types.InputFiles;
 
 namespace bot_Application
 {
-    class _MainProgramm
+    class Program
     {
-        private static bool isHello = false, isYesOrNo = false, isTypingInfo = false;
-        private static void Main(string[] args)
-        {
-            TelegramBotClient bot = new TelegramBotClient("6218350946:AAHR0Z4Z5M36BNVmkGEmfdU__JA_CKk3Jgs");
-            bot.StartReceiving(Update, Error);
-            Console.ReadLine();
-        }
-        async private static Task Update(ITelegramBotClient client, Update upd, CancellationToken token)
-        {
-            if(upd.Message.Text != null )
-            {      
-                if(isTypingInfo)
-                {
-                    string info = upd.Message.Text;
-                    /*Проверка корректности ввода данных от пользователя*/
-                }
-                if (isHello && isYesOrNo)
-                {
-                    await client.SendTextMessageAsync(
-                            upd.Message.Chat.Id, 
-                            "Не совсем вас понял, но вот что можно сделать", 
-                            replyMarkup: replyMainMenuWithYesKeyboardMarkup);
-                }
-                if(isYesOrNo)
-                {
-                    return;
-                }
-                if(upd.Message.Text == "ДА")
-                {
-                    isHello = true;
-                    isYesOrNo = true;
-                        await client.SendTextMessageAsync(
-                            upd.Message.Chat.Id, 
-                            "Что интересует?", 
-                            replyMarkup: replyMainMenuWithYesKeyboardMarkup
-                        );
-                    /*Проверка анкеты*/
-                }
-                else if(upd.Message.Text == "НЕТ")
-                {
-                    isHello = true;
-                        await client.SendTextMessageAsync(
-                            upd.Message.Chat.Id, 
-                            "Ничего страшного, сейчас вместе создадим вашу анкету!\nОдним сообщением введите следующую информацию:\n1. Фамилия Имя\n2. Адрес электронной почты\n3. Номер телефона\n!!!ОБЯЗАТЕЛЬНО!!! каждый пункт заполняйте на новой строке но в одном сообщении!",
-                            replyMarkup: new ReplyKeyboardRemove()
-                        );
-                }
-                if(isHello)
-                {
-                    return;
-                }
-                await client.SendTextMessageAsync(
-                    upd.Message.Chat.Id, 
-                    "Вас приветствует бот для поиска полезных контактов! У вас уже есть анкета?", 
-                    replyMarkup: replyMainMenuWithNoOrYesKeyboardMarkup);   
-
+        private static TelegramBotClient bot = new TelegramBotClient("6124120673:AAE8WOnQ0VOq00bVsQKwUnrJnaCYshNUCMs");
+        private static string mode = "";
+        private static InlineKeyboardMarkup ShowInlineButtons = new
+        (
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("ДА", callbackData:"ДА"),
+                InlineKeyboardButton.WithCallbackData("НЕТ", callbackData:"НЕТ")
             }
-        }
-        private static bool CheckForm() /*КУСОК В РАЗРАБОТКЕ*/
-        {
-            return true;
-        }
-        private static ReplyKeyboardMarkup replyMainMenuWithYesKeyboardMarkup = new(new[]
+        );
+        private static ReplyKeyboardMarkup ShowMainMenu = new(new[]
         {
             new KeyboardButton[] { "Найти друзей", "Изменить анкету"},
             new KeyboardButton[] { "Инструкция", "Удалить анкету"}
@@ -78,13 +28,125 @@ namespace bot_Application
         {
             ResizeKeyboard = true
         };
-        private static ReplyKeyboardMarkup replyMainMenuWithNoOrYesKeyboardMarkup = new(new[]
+        private static InlineKeyboardMarkup PleaseHelpMe = new
+        (
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("ПОМОГИТЕ!!! :(", callbackData:"помогите"),
+            }
+        );
+        private static void Main(string[] args)
         {
-            new KeyboardButton[] { "ДА", "НЕТ"}
-        })
+            bot.StartReceiving(updateHandler: Update, pollingErrorHandler: Error);
+            Console.ReadLine(); 
+        }
+        async private static Task Update(ITelegramBotClient client, Update update, CancellationToken token)
         {
-            ResizeKeyboard = true
-        };
+            switch(update.Type)
+            {
+                case Telegram.Bot.Types.Enums.UpdateType.Message:
+                    switch(update.Message.Text + mode)
+                    {
+                        case "/start":
+                            mode = "YesOrNo";
+                            await client.SendTextMessageAsync
+                            (
+                                update.Message.Chat.Id, 
+                                "Вас приветствует БОТ для поиска друзей!!!\nВы уже создали свою анкету?", 
+                                replyMarkup: ShowInlineButtons
+                            );
+                        break;
+                        case string temp when temp.Contains("registration"):
+                            if(IsCorrectData(temp))
+                            {
+                                mode = "ok";
+                                await client.SendTextMessageAsync
+                                (
+                                    update.Message.Chat.Id, 
+                                    "Всё круто!!!\nВот какие возможности вам теперь доступны!!!",
+                                    replyMarkup: ShowMainMenu
+                                );
+                            }
+                            else
+                            {
+                                await client.SendTextMessageAsync
+                                (
+                                    update.Message.Chat.Id, 
+                                    "Введённые вами данные НЕКОРРЕКТНЫ!!!\nПожалуйста проверьте всё внимательно!!!",
+                                    replyMarkup: PleaseHelpMe
+                                );
+                            }
+                        break;
+                        default:
+                            await client.DeleteMessageAsync(chatId: update.Message.Chat.Id, update.Message.MessageId);
+                        break;
+                    }
+                break;
+
+                case Telegram.Bot.Types.Enums.UpdateType.CallbackQuery:
+                    switch(update.CallbackQuery.Data)
+                    {
+                        case "ДА":
+                            await client.SendTextMessageAsync
+                            (
+                                chatId: update.CallbackQuery.Message.Chat.Id, 
+                                text: "Прекрасно!!! Удачи!!!", 
+                                replyMarkup: ShowMainMenu
+                            );
+                            await client.AnswerCallbackQueryAsync(callbackQueryId: update.CallbackQuery.Id);
+                        break;
+                        case "НЕТ":
+                            mode = "registration";
+                            await client.SendTextMessageAsync
+                            (
+                                chatId: update.CallbackQuery.Message.Chat.Id, 
+                                text: "Ничего страшного, сейчас быстро создадим анкету!!!\nВот что необходимо сделать:\nНеобходимо одним сообщением указать следующие данные\n\n1. Фамилия Имя\n2. Почта\n3. Телефон\n4. Немного о себе\n\n В верхней части сообщения укажите команду /registration\n\n!!!КАЖДЫЙ ПУНКТ ЗАПОЛНЯТЬ С НОВОЙ СТРОКИ, НО В ОДНОМ СООБЩЕНИИ!!!"
+                                //replyMarkup: ReplyKeyboardRemove
+                            );
+                            await client.SendTextMessageAsync
+                            (
+                                chatId: update.CallbackQuery.Message.Chat.Id, 
+                                text: "Вот пример для наглядности!"
+                            );
+                            using (var fileStream = new FileStream("D:/Tusur/PROJECT_TEST/B/BOT/registrationExample.PNG", FileMode.Open, FileAccess.Read, FileShare.Read))
+                            {
+                                await client.SendPhotoAsync(
+                                    chatId: update.CallbackQuery.Message.Chat.Id,
+                                    photo: new InputOnlineFile(fileStream)
+                                );
+                                fileStream.Close();
+                            }
+                            await client.AnswerCallbackQueryAsync(callbackQueryId: update.CallbackQuery.Id);
+                        break;
+                        case "помогите":
+                            await client.SendTextMessageAsync
+                            (
+                                chatId: update.CallbackQuery.Message.Chat.Id, 
+                                text: "Вот что необходимо сделать:\nНеобходимо одним сообщением указать следующие данные\n\n1. Фамилия Имя\n2. Почта\n3. Телефон\n4. Немного о себе\n\n В верхней части сообщения укажите команду /registration\n\n!!!КАЖДЫЙ ПУНКТ ЗАПОЛНЯТЬ С НОВОЙ СТРОКИ, НО В ОДНОМ СООБЩЕНИИ!!!"
+                            );
+                            await client.SendTextMessageAsync
+                            (
+                                chatId: update.CallbackQuery.Message.Chat.Id, 
+                                text: "Вот пример для наглядности!"
+                            );
+                            using (var fileStream = new FileStream("D:/Tusur/PROJECT_TEST/B/BOT/registrationExample.PNG", FileMode.Open, FileAccess.Read, FileShare.Read))
+                            {
+                                await client.SendPhotoAsync(
+                                    chatId: update.CallbackQuery.Message.Chat.Id,
+                                    photo: new InputOnlineFile(fileStream)
+                                );
+                                fileStream.Close();
+                            }
+                            await client.AnswerCallbackQueryAsync(callbackQueryId: update.CallbackQuery.Id);
+                        break;
+                    }
+                break;
+            }
+        }
+        private static bool IsCorrectData(string UserInfo)//КУСОК В РАЗРАБОТКЕ
+        {
+            return false;
+        }
         private static Task Error(ITelegramBotClient arg1, Exception arg2, CancellationToken arg3)
         {
              throw new NotImplementedException();
